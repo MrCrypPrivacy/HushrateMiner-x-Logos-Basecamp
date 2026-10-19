@@ -1,0 +1,31 @@
+Hushrate Miner for Logos Basecamp
+Copyright (c) 2026 MrCrypPrivacy. All rights reserved.
+
+This source code and the software built from it are proprietary. No license is
+granted except the limited permissions below.
+
+You MAY:
+  - read the source code in this repository;
+  - build the software for your own personal, non-commercial use;
+  - run the software for your own personal, non-commercial use;
+  - report problems or suggest changes through the repository's issue tracker.
+
+You MAY NOT, without prior written permission from the copyright holder:
+  - copy, redistribute, publish, mirror or host the software or its source code,
+    in whole or in part, in original or modified form;
+  - sell, rent, sublicense or otherwise commercialize the software, or include it
+    in a product or service that is offered to others;
+  - modify the software and distribute the result;
+  - remove or alter this notice.
+
+The software is provided "as is", without warranty of any kind. The copyright
+holder is not liable for any damages arising from its use, including hardware
+wear, lost income or lost funds.
+
+Third-party software: this project does not include XMRig or P2Pool. At runtime
+it downloads their official releases, which remain under their own licenses
+(GPLv3), and this license does not apply to them.
+
+Note: hosting this repository on GitHub also grants GitHub and its users the
+rights described in the GitHub Terms of Service (viewing and forking within the
+platform). Nothing here extends those rights.
