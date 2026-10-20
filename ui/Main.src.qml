@@ -106,7 +106,7 @@ Item {
         if (typeof logos === "undefined" || !logos.callModule)
             return { error: "Logos bridge not available" }
         var raw
-        try { raw = String(logos.callModule("minimal", method, args)) }
+        try { raw = String(logos.callModule("hushrate_core", method, args)) }
         catch (e) { return { error: "EXCEPTION: " + e } }
         var v
         try { v = JSON.parse(raw) } catch (e1) { return { error: raw } }
@@ -121,7 +121,7 @@ Item {
 
     function rawCall(m, a) {
         if (typeof logos === "undefined" || !logos.callModule) return "NO BRIDGE (logos object missing)"
-        try { return String(logos.callModule("minimal", m, a)) } catch (e) { return "EXCEPTION: " + e }
+        try { return String(logos.callModule("hushrate_core", m, a)) } catch (e) { return "EXCEPTION: " + e }
     }
     function selfTest() {
         var out = [], ms = ["ping", "hwInfo", "sysStats", "binStatus", "mineState", "nodeScanState", "jobState"]

@@ -27,12 +27,20 @@ track_changes() {   # nix flakes only see git-tracked files: stage what changed,
 
 write_module() {
   mkdir -p "$MODULE/src"
-  cp -f "$REPO"/module/src/minimal_impl.h "$REPO"/module/src/minimal_impl.cpp "$REPO"/module/src/hushrate_keys.h "$MODULE/src/"
+  rm -f "$MODULE"/src/minimal_impl.h "$MODULE"/src/minimal_impl.cpp   # left over from the template
+  cp -f "$REPO"/module/src/hushrate_core_impl.h "$REPO"/module/src/hushrate_core_impl.cpp "$REPO"/module/src/hushrate_keys.h "$MODULE/src/"
+  sed -i -e 's/minimal_impl/hushrate_core_impl/g' -e 's/MinimalModulePlugin/HushrateCorePlugin/' "$MODULE/CMakeLists.txt"
   PKG_VERSION="$PKG_VERSION" python3 -I - "$MODULE/metadata.json" <<'PY'
 import json, os, sys
 p = sys.argv[1]
 d = json.load(open(p))
-d["version"] = os.environ["PKG_VERSION"]
+d.update({
+    "name": "hushrate_core",
+    "display_name": "Hushrate Core",
+    "version": os.environ["PKG_VERSION"],
+    "description": "Hushrate Miner core: downloads and verifies XMRig and P2Pool and runs them",
+    "main": "hushrate_core_plugin",
+})
 json.dump(d, open(p, "w"), indent=2)
 PY
 }
@@ -46,7 +54,7 @@ write_ui() {
   inputs = {
     logos-module-builder.url = "github:logos-co/logos-module-builder";
     # Attribute name must match the dependency name in metadata.json.
-    minimal.url = "path:$MODULE";
+    hushrate_core.url = "path:$MODULE";
   };
 
   outputs = inputs@{ logos-module-builder, ... }:
@@ -74,7 +82,7 @@ d.update({
     "description": "Hushrate Miner: solo Monero mining with P2Pool + XMRig",
     "type": "ui_qml",
     "view": "Main.qml",
-    "dependencies": ["minimal"],
+    "dependencies": ["hushrate_core"],
     "category": "tools",
     "icon": "icons/hushrate.png",
 })

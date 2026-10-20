@@ -1,4 +1,4 @@
-#include "minimal_impl.h"
+#include "hushrate_core_impl.h"
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -23,7 +23,7 @@ int main(int argc, char** argv)
     std::string W = argv[1];     // work dir prepared by run_tests.sh
     std::string port = argv[2];
     std::string api = "http://127.0.0.1:" + port;
-    MinimalImpl m;
+    HushrateCoreImpl m;
 
     // sha + sums
     CHECK(hushrateTestSha(W + "/files/data.bin") == rd(W + "/data.sha"), "sha256 matches sha256sum");

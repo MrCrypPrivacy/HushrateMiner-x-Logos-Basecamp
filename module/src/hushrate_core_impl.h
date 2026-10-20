@@ -6,7 +6,7 @@
 // Hushrate Miner core (Linux): downloads and verifies XMRig/P2Pool (SHA256 +
 // pinned GPG key), runs P2Pool + XMRig, exposes state. Everything is
 // std::string; replies are JSON text.
-class MinimalImpl : public LogosModuleContext
+class HushrateCoreImpl : public LogosModuleContext
 {
 public:
     std::string ping();

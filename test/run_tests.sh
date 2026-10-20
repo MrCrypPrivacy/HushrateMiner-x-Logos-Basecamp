@@ -95,7 +95,7 @@ chmod +x "$W/fakebin/"*
 sleep 1
 export HOME="$W/home"
 RC=0
-g++ -std=c++17 -DHUSHRATE_TEST -I"$HERE/stub" -I"$HERE/../module/src" "$HERE/../module/src/minimal_impl.cpp" "$HERE/test_main.cpp" -o "$W/t" -pthread
+g++ -std=c++17 -DHUSHRATE_TEST -I"$HERE/stub" -I"$HERE/../module/src" "$HERE/../module/src/hushrate_core_impl.cpp" "$HERE/test_main.cpp" -o "$W/t" -pthread
 stdbuf -oL "$W/t" "$W" "$PORT" "$RPC" "$ZMQ" "$((PORT+3))" || RC=$?
 kill "$(cat "$W/http.pid")" "$(cat "$W/lis.pid")" 2>/dev/null || true
 echo "leftover fake procs after exit:"; pgrep -af "$W/fakebin" || echo "  none"

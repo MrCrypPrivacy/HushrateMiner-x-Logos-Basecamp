@@ -1,4 +1,4 @@
-#include "minimal_impl.h"
+#include "hushrate_core_impl.h"
 #include "hushrate_keys.h"
 
 #include <algorithm>
@@ -1255,16 +1255,16 @@ Guard g_guard;
 
 // ============================================================== public API
 
-std::string MinimalImpl::ping() { return "ok"; }
+std::string HushrateCoreImpl::ping() { return "ok"; }
 
-std::string MinimalImpl::setBinDir(const std::string& dir)
+std::string HushrateCoreImpl::setBinDir(const std::string& dir)
 {
     std::lock_guard<std::mutex> l(g_mu);
     g_binDir = trim(dir);
     return jstr("bin dir = " + (g_binDir.empty() ? homeDir() + "/.local/share/hushrate/bin" : g_binDir));
 }
 
-std::string MinimalImpl::binStatus()
+std::string HushrateCoreImpl::binStatus()
 {
     std::string dir = binDir();
     std::ostringstream o;
@@ -1282,7 +1282,7 @@ std::string MinimalImpl::binStatus()
     return o.str();
 }
 
-std::string MinimalImpl::binInstall(const std::string& which)
+std::string HushrateCoreImpl::binInstall(const std::string& which)
 {
     std::vector<std::string> names;
     if (which == "all") names = { "xmrig", "p2pool" };
@@ -1309,7 +1309,7 @@ std::string MinimalImpl::binInstall(const std::string& which)
     return "{\"started\":true}";
 }
 
-std::string MinimalImpl::binTrust(const std::string& which)
+std::string HushrateCoreImpl::binTrust(const std::string& which)
 {
     if (which != "xmrig" && which != "p2pool") return "{\"error\":\"which must be xmrig or p2pool\"}";
     std::string dir = binDir(), path = dir + "/" + which;
@@ -1320,7 +1320,7 @@ std::string MinimalImpl::binTrust(const std::string& which)
     return "{\"trusted\":true}";
 }
 
-std::string MinimalImpl::jobState()
+std::string HushrateCoreImpl::jobState()
 {
     std::lock_guard<std::mutex> l(g_mu);
     std::string o = "{\"running\":" + jbool(g_jobRunning) + ",\"ok\":" + jbool(g_jobOk) + ",\"log\":[";
@@ -1328,7 +1328,7 @@ std::string MinimalImpl::jobState()
     return o + "]}";
 }
 
-std::string MinimalImpl::mineStart(const std::string& cfg)
+std::string HushrateCoreImpl::mineStart(const std::string& cfg)
 {
     std::map<std::string, std::string> kv;
     for (auto& l : split(cfg, '\n')) {
@@ -1370,22 +1370,22 @@ std::string MinimalImpl::mineStart(const std::string& cfg)
 }
 
 
-std::string MinimalImpl::sysStats()
+std::string HushrateCoreImpl::sysStats()
 {
     return sysStatsJson();
 }
 
-std::string MinimalImpl::hwInfo()
+std::string HushrateCoreImpl::hwInfo()
 {
     return hwInfoJson();
 }
 
-std::string MinimalImpl::cfgLoad()
+std::string HushrateCoreImpl::cfgLoad()
 {
     return jstr(readFile(configPath()));
 }
 
-std::string MinimalImpl::cfgSave(const std::string& text)
+std::string HushrateCoreImpl::cfgSave(const std::string& text)
 {
     if (text.size() > 65536) return "{\"error\":\"config too large\"}";
     std::error_code ec;
@@ -1400,7 +1400,7 @@ std::string MinimalImpl::cfgSave(const std::string& text)
     return "{\"saved\":true}";
 }
 
-std::string MinimalImpl::updateCheck()
+std::string HushrateCoreImpl::updateCheck()
 {
     std::lock_guard<std::mutex> l(g_updMu);
     if (g_updRunning) return "{\"started\":false,\"note\":\"already checking\"}";
@@ -1410,7 +1410,7 @@ std::string MinimalImpl::updateCheck()
     return "{\"started\":true}";
 }
 
-std::string MinimalImpl::updateState()
+std::string HushrateCoreImpl::updateState()
 {
     std::lock_guard<std::mutex> l(g_updMu);
     std::string o = "{\"running\":" + jbool(g_updRunning) + ",\"done\":" + jbool(g_updDone) + ",\"error\":" + jstr(g_updErr);
@@ -1423,7 +1423,7 @@ std::string MinimalImpl::updateState()
     return o + "}";
 }
 
-std::string MinimalImpl::nodeScan(const std::string& cfg)
+std::string HushrateCoreImpl::nodeScan(const std::string& cfg)
 {
     if (g_mining) return "{\"error\":\"mining is running\"}";
     if (g_scanRunning) return "{\"started\":false,\"note\":\"already scanning\"}";
@@ -1449,7 +1449,7 @@ std::string MinimalImpl::nodeScan(const std::string& cfg)
     return "{\"started\":true}";
 }
 
-std::string MinimalImpl::nodeScanState()
+std::string HushrateCoreImpl::nodeScanState()
 {
     std::lock_guard<std::mutex> lk(g_scanMu);
     std::string o = "{\"running\":" + jbool(g_scanRunning) + ",\"valid\":" + jbool(g_scan.valid) + ",\"count\":" + std::to_string(g_scan.usable.size());
@@ -1465,14 +1465,14 @@ std::string MinimalImpl::nodeScanState()
     return o + "]}";
 }
 
-std::string MinimalImpl::mineStop()
+std::string HushrateCoreImpl::mineStop()
 {
     if (!g_mining) return "{\"stopped\":false,\"note\":\"not running\"}";
     g_stop = true;
     return "{\"stopping\":true}";
 }
 
-std::string MinimalImpl::mineState()
+std::string HushrateCoreImpl::mineState()
 {
     std::lock_guard<std::mutex> l(g_mu);
     return "{\"phase\":" + jstr(g_phase) + ",\"node\":" + jstr(g_node) + ",\"hashrate\":" + jstr(g_hash) +
@@ -1482,7 +1482,7 @@ std::string MinimalImpl::mineState()
            ",\"uptime\":" + std::to_string((g_mining && g_phase == "mining") || g_paused ? (long)std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - g_startedAt).count() : 0L) + "}";
 }
 
-std::string MinimalImpl::mineLog(const std::string& since)
+std::string HushrateCoreImpl::mineLog(const std::string& since)
 {
     size_t from = (size_t)std::max(0L, std::atol(since.c_str()));
     std::lock_guard<std::mutex> l(g_mu);
