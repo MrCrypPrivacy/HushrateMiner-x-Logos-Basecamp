@@ -38,8 +38,6 @@ https://raw.githubusercontent.com/MrCrypPrivacy/HushrateMiner-Catalog/refs/heads
 4. Open `hushrate_miner` in the sidebar. If it is not listed, go to Settings, Module
    Inspector and load it
 
-The packages are not signed yet, so Basecamp cannot verify the publisher by signature.
-
 ### From a release
 
 Download these files from the [latest release](../../releases/latest):
