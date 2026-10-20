@@ -7,6 +7,8 @@ wallet. There is no account, no custody and no pool operator.
 
 Version 0.9.1b (beta)
 
+![Hushrate Miner running in Logos Basecamp](assets/screenshot.png)
+
 ## Features
 
 - One page for wallet, node, threads, start and stop
@@ -21,6 +23,24 @@ Version 0.9.1b (beta)
   Arabic, Turkish, Korean, Italian, Indonesian and Hindi
 
 ## Installation
+
+### From the package catalog
+
+1. Open Basecamp and go to Package Manager, then Add repository
+2. Paste this URL:
+
+```
+https://raw.githubusercontent.com/MrCrypPrivacy/HushrateMiner-Catalog/refs/heads/main/logos-repo.json
+```
+
+3. Install `hushrate_miner`. It needs the core module `hushrate_core`; if Basecamp does not
+   install it automatically, install `hushrate_core` first
+4. Open `hushrate_miner` in the sidebar. If it is not listed, go to Settings, Module
+   Inspector and load it
+
+The packages in the catalog are not signed yet.
+
+### From a release
 
 Download these files from the [latest release](../../releases/latest):
 
