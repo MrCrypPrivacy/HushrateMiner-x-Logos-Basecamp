@@ -19,7 +19,7 @@ UI="$ROOT/ui"
 RUN="$ROOT/run"
 DIST="$ROOT/dist"
 VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
-PKG_VERSION="0.9.0"   # package metadata must be semver; the UI shows $VERSION
+PKG_VERSION="0.9.1"   # package metadata must be semver; the UI shows $VERSION
 
 track_changes() {   # nix flakes only see git-tracked files: stage what changed, file by file
   git ls-files -z --others --modified --exclude-standard | xargs -0 -r git add --
