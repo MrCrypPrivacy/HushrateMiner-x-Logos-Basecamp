@@ -33,12 +33,12 @@ Version 0.9.1b (beta)
 https://raw.githubusercontent.com/MrCrypPrivacy/HushrateMiner-Catalog/refs/heads/main/logos-repo.json
 ```
 
-3. Install `hushrate_miner`. It needs the core module `hushrate_core`; if Basecamp does not
-   install it automatically, install `hushrate_core` first
+3. Install `hushrate_miner`. The core module `hushrate_core` is installed automatically as a
+   dependency
 4. Open `hushrate_miner` in the sidebar. If it is not listed, go to Settings, Module
    Inspector and load it
 
-The packages in the catalog are not signed yet.
+The packages are not signed yet, so Basecamp cannot verify the publisher by signature.
 
 ### From a release
 
