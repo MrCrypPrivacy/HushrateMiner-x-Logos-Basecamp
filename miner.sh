@@ -64,7 +64,7 @@ write_ui() {
 NIX
   local links=()
   [ -f "$ROOT/links.json" ] && links=("$ROOT/links.json")
-  python3 -I "$REPO/tools/build_ui.py" "$UI/Main.qml" "${links[@]}"
+  python3 -I "$REPO/tools/build_ui.py" "$UI/Main.qml" ${links[@]+"${links[@]}"}
   cp -f "$REPO/assets/sidebar_256.png" "$UI/icons/hushrate.png"
   cp -f "$REPO/ui/metadata.json" "$UI/metadata.json"
 }
