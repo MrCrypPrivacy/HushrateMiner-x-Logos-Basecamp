@@ -23,12 +23,35 @@ jobs:
 
   build:
     needs: test
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            variant: linux-amd64
+          - os: macos-latest
+            variant: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    # The macOS build is informational until it has been proven: a failure there
+    # does not stop the Linux package from being built and published.
+    continue-on-error: ${{ matrix.variant == 'darwin-arm64' }}
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       # Installs Nix with the public Logos binary caches (read only, no token needed).
       - uses: logos-co/setup-nix-cache-action@781f072122f4df6af0e33a7d355ebd20283e019e # v1.2.0
+      - name: Ensure Metal Toolchain
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if /usr/bin/xcrun metal --version >/dev/null 2>&1; then
+            echo "Metal Toolchain present"
+            exit 0
+          fi
+          echo "Metal Toolchain missing, downloading..."
+          xcodebuild -downloadComponent MetalToolchain
+          /usr/bin/xcrun metal --version
       - name: Build the packages
         env:
           HUSHRATE_BUILD: ${{ runner.temp }}/build
@@ -37,13 +60,50 @@ jobs:
           ./miner.sh package
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
+          name: packages-${{ matrix.variant }}
+          path: ${{ runner.temp }}/build/dist/*.lgx
+          if-no-files-found: error
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: logos-co/setup-nix-cache-action@781f072122f4df6af0e33a7d355ebd20283e019e # v1.2.0
+      - name: Set up the lgx tool
+        run: |
+          nix build github:logos-co/logos-package#lgx --out-link "$RUNNER_TEMP/lgx-tool"
+          echo "$RUNNER_TEMP/lgx-tool/bin" >> "$GITHUB_PATH"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: _per-platform
+          pattern: packages-*
+      - name: Merge the platforms into one package each
+        run: |
+          set -euo pipefail
+          ver="$(tr -d '[:space:]' < VERSION)"
+          mkdir -p dist
+          for pkg in hushrate-core hushrate-miner-ui; do
+            mapfile -t files < <(find _per-platform -type f -name "${pkg}-${ver}.lgx" | sort)
+            case ${#files[@]} in
+              0) echo "::error::no ${pkg} package was built"; exit 1 ;;
+              1) echo "::warning::only one platform was built for ${pkg}: ${files[0]}"
+                 cp "${files[0]}" "dist/${pkg}-${ver}.lgx" ;;
+              *) echo "merging ${#files[@]} platforms for ${pkg}"
+                 lgx merge "${files[@]}" -o "dist/${pkg}-${ver}.lgx" -y ;;
+            esac
+            lgx verify "dist/${pkg}-${ver}.lgx"
+          done
+          ( cd dist && sha256sum ./*.lgx > SHA256SUMS && cat SHA256SUMS )
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
           name: hushrate-packages
-          path: ${{ runner.temp }}/build/dist/*
+          path: dist/*
           if-no-files-found: error
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: package
     runs-on: ubuntu-latest
     permissions:
       contents: write

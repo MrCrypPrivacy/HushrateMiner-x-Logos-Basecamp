@@ -20,6 +20,8 @@ RUN="$ROOT/run"
 DIST="$ROOT/dist"
 VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
 
+sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
+
 track_changes() {   # nix flakes only see git-tracked files: stage what changed, file by file
   git ls-files -z --others --modified --exclude-standard | xargs -0 -r git add --
 }
@@ -123,7 +125,7 @@ package() {
   mkdir -p "$DIST"
   cp -f "$RUN"/module-lgx-portable/*.lgx "$DIST/hushrate-core-$VERSION.lgx"
   cp -f "$RUN"/ui-lgx-portable/*.lgx "$DIST/hushrate-miner-ui-$VERSION.lgx"
-  ( cd "$DIST" && sha256sum ./*.lgx > SHA256SUMS && cat SHA256SUMS )
+  ( cd "$DIST" && sha256 ./*.lgx > SHA256SUMS && cat SHA256SUMS )
   echo
   echo "Packages are in: $DIST"
   echo "Install order in Basecamp: the core package first, then the UI package."
