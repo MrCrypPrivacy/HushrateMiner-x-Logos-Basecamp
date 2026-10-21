@@ -5,7 +5,7 @@ Solo Monero (XMR) mining for [Logos Basecamp](https://logos.co). Hushrate Miner 
 behind a single page: paste your address, press start. Payouts go straight to your own
 wallet. There is no account, no custody and no pool operator.
 
-Version 0.9.1b (beta)
+Version 0.9.2b (beta)
 
 ![Hushrate Miner running in Logos Basecamp](assets/screenshot.png)
 

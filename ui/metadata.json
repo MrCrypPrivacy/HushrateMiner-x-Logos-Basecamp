@@ -1,7 +1,7 @@
 {
   "name": "hushrate_miner",
   "display_name": "HushRate Miner",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "type": "ui_qml",
   "category": "tools",
   "description": "Hushrate Miner: solo Monero mining with P2Pool + XMRig",
