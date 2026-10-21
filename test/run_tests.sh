@@ -61,7 +61,9 @@ def serve(p,hs,host='127.0.0.1'):
             else:
                 pass   # accepts TCP, never speaks ZMQ (like a firewall/proxy)
     threading.Thread(target=loop,daemon=True).start()
-serve(rpc,False); serve(zmq,True); serve(dumb,False,'127.0.0.2')
+serve(rpc,False); serve(zmq,True)
+try: serve(dumb,False,'127.0.0.2')
+except Exception: pass
 try: serve(18083,True)
 except Exception: pass
 time.sleep(600)

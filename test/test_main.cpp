@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <thread>
+#include <sys/stat.h>
 #include <unistd.h>
 bool hushrateTestInstall(const std::string&, const std::string&, const std::vector<std::string>&, const std::string&, const std::string&,
                          const std::string&, const std::string&, const std::string&, const std::string&, std::string&);
@@ -143,7 +144,8 @@ int main(int argc, char** argv)
       CHECK(has(m.cfgSave(txt), "saved"), "cfgSave");
       std::string path = W + "/home/.local/share/hushrate/config.txt";
       CHECK(rd(path) == txt, "config file content exact");
-      CHECK(system(("test \"$(stat -c %a " + path + ")\" = 600").c_str()) == 0, "config mode 0600");
+      struct stat sb;
+      CHECK(stat(path.c_str(), &sb) == 0 && (sb.st_mode & 0777) == 0600, "config mode 0600");
       CHECK(has(m.cfgLoad(), "worker=rig") && has(m.cfgLoad(), "\\\"q\\\""), "cfgLoad returns JSON string");
       CHECK(has(m.cfgSave(std::string(70000, 'x')), "too large"), "oversized config rejected");
       hushrateTestDynamic(api + "/nodes.json");
@@ -187,7 +189,7 @@ int main(int argc, char** argv)
     // update check (read only): installed tag older than the latest release -> newer
     { m.setBinDir(W + "/bin1");
       hushrateTestUpdate(api, "t/xmrig", "t/p2pool");
-      system(("sed -i 's/v9.9.9/v1.0.0/' " + W + "/bin1/.hushrate-integrity.txt").c_str());
+      system(("sed -i.bak 's/v9.9.9/v1.0.0/' " + W + "/bin1/.hushrate-integrity.txt && rm -f " + W + "/bin1/.hushrate-integrity.txt.bak").c_str());
       m.updateCheck();
       std::string us;
       for (int i = 0; i < 40; ++i) { usleep(250000); us = m.updateState(); if (has(us, "\"running\":false") && has(us, "\"done\":true")) break; }
