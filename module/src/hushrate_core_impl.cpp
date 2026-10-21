@@ -34,6 +34,12 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
+#ifdef __APPLE__
+#include <mach/mach.h>
+#include <sys/event.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#endif
 
 namespace fs = std::filesystem;
 extern char** environ;
@@ -213,6 +219,9 @@ std::string findExe(const std::string& name)
     if (name.find('/') != std::string::npos) return name;
     std::string path = getenv("PATH") ? getenv("PATH") : "";
     path += ":/usr/bin:/bin:/usr/local/bin";
+#ifdef __APPLE__
+    path += ":/opt/homebrew/bin:/opt/local/bin";   // Homebrew (Apple Silicon) and MacPorts
+#endif
     for (auto& d : split(path, ':')) {
         if (d.empty()) continue;
         std::string p = d + "/" + name;
@@ -233,6 +242,26 @@ std::vector<std::string> cleanEnv()
     }
     return e;
 }
+
+#ifdef __APPLE__
+// macOS has no parent-death signal. A small watchdog process, started in the miner's own
+// process group, kills that group if the parent goes away. It ends when the miner exits.
+[[noreturn]] void watchdogMain(pid_t parent, pid_t miner)
+{
+    long maxfd = getdtablesize();
+    if (maxfd > 4096) maxfd = 4096;
+    for (int fd = 0; fd < maxfd; ++fd) close(fd);
+    int kq = kqueue();
+    if (kq < 0) _exit(0);
+    struct kevent ch[2], ev[2];
+    EV_SET(&ch[0], (uintptr_t)parent, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, nullptr);
+    EV_SET(&ch[1], (uintptr_t)miner, EVFILT_PROC, EV_ADD | EV_ONESHOT, NOTE_EXIT, 0, nullptr);
+    int n = kevent(kq, ch, 2, ev, 2, nullptr);
+    for (int i = 0; i < n; ++i)
+        if ((pid_t)ev[i].ident == parent) kill(-miner, SIGKILL);
+    _exit(0);
+}
+#endif
 
 bool spawn(Child& c, const std::string& exe, const std::vector<std::string>& args, const std::string& cwd,
            bool dieWithParent, bool mergeErr, std::string& err)
@@ -258,8 +287,13 @@ bool spawn(Child& c, const std::string& exe, const std::vector<std::string>& arg
     if (pid < 0) { err = std::string("fork: ") + std::strerror(errno); return false; }
     if (pid == 0) {
         setpgid(0, 0);
-#ifdef __linux__
+#if defined(__linux__)
         if (dieWithParent) prctl(PR_SET_PDEATHSIG, SIGKILL);
+#elif defined(__APPLE__)
+        if (dieWithParent) {
+            pid_t parentPid = getppid(), minerPid = getpid();
+            if (fork() == 0) watchdogMain(parentPid, minerPid);
+        }
 #else
         (void)dieWithParent;
 #endif
@@ -464,12 +498,21 @@ struct Spec {
 
 const Spec& specFor(const std::string& n)
 {
+#ifdef __APPLE__
+    static const Spec xm = { "xmrig", "xmrig/xmrig",
+        { "macos-arm64" },
+        "SHA256SUMS", "SHA256SUMS.sig", kXmrigKey, kXmrigFingerprint };
+    static const Spec pp = { "p2pool", "SChernykh/p2pool",
+        { "macos-aarch64", "macos-arm64" },
+        "sha256sums.txt.asc", "", kP2poolKey, kP2poolFingerprint };
+#else
     static const Spec xm = { "xmrig", "xmrig/xmrig",
         { "linux-static-x64", "linux-musl-x64", "linux-x64", "linux-x86_64" },
         "SHA256SUMS", "SHA256SUMS.sig", kXmrigKey, kXmrigFingerprint };
     static const Spec pp = { "p2pool", "SChernykh/p2pool",
         { "linux-x64", "linux-x86_64", "linux-amd64" },
         "sha256sums.txt.asc", "", kP2poolKey, kP2poolFingerprint };
+#endif
     return n == "xmrig" ? xm : pp;
 }
 
@@ -587,7 +630,11 @@ struct Gpg {
     Gpg(const std::string& keyText)
     {
         gpg = findExe("gpg");
+#ifdef __APPLE__
+        if (gpg.empty()) { err = "gpg is not installed (e.g. 'brew install gnupg')"; return; }
+#else
         if (gpg.empty()) { err = "gpg is not installed (e.g. 'sudo dnf install gnupg2')"; return; }
+#endif
         char tmpl[] = "/tmp/hushrate-gpg-XXXXXX";
         if (!mkdtemp(tmpl)) { err = "cannot create temp dir"; return; }
         home = tmpl;
@@ -697,7 +744,7 @@ bool installOne(const Spec& sp, const std::string& dir, const InstallOpts& io, s
         }
         if (!assetUrl.empty()) break;
     }
-    if (assetUrl.empty()) { why = "no matching Linux x64 asset in release " + tag; return false; }
+    if (assetUrl.empty()) { why = "no matching asset for this platform in release " + tag; return false; }
     auto urlOf = [&](const std::string& n) { for (auto& u : urls) if (baseName(u) == n) return u; return std::string(); };
     std::string sumsUrl = urlOf(sp.sumsName), sigUrl = sp.sigName.empty() ? "" : urlOf(sp.sigName);
     if (sumsUrl.empty() || (!sp.sigName.empty() && sigUrl.empty())) { why = "checksum/signature files missing in release " + tag; return false; }
@@ -792,6 +839,9 @@ double cpuTempC()
     if (const char* f = std::getenv("HUSHRATE_FAKE_TEMP")) { std::string v = trim(readFile(f)); if (!v.empty()) return std::atof(v.c_str()); }
 #endif
     double temp = -1;
+#ifdef __APPLE__
+    return temp;   // no unprivileged temperature source on macOS
+#endif
     std::error_code ec;
     for (const char* want : { "coretemp", "k10temp", "zenpower", "cpu_thermal" }) {
         for (auto& d : fs::directory_iterator("/sys/class/hwmon", ec)) {
@@ -811,6 +861,13 @@ bool onBattery()
 {
 #ifdef HUSHRATE_TEST
     if (const char* f = std::getenv("HUSHRATE_FAKE_BAT")) return trim(readFile(f)) == "1";
+#endif
+#ifdef __APPLE__
+    {
+        std::string o, e;
+        if (runCapture("/usr/bin/pmset", { "-g", "batt" }, 5, o, e) != 0) return false;
+        return o.find("'Battery Power'") != std::string::npos;
+    }
 #endif
     std::error_code ec;
     bool haveBat = false, acOnline = false, haveAc = false;
@@ -1041,12 +1098,64 @@ void probeAll(std::vector<Probe>& v)
 
 // ---------------------------------------------------------- system info
 
+#ifdef __APPLE__
+uint64_t sysctlNum(const char* name)
+{
+    uint64_t v = 0;
+    size_t len = sizeof v;
+    if (sysctlbyname(name, &v, &len, nullptr, 0) != 0) return 0;
+    return v;
+}
+
+bool cpuTicks(unsigned long long& total, unsigned long long& idle)
+{
+    natural_t n = 0;
+    processor_info_array_t info = nullptr;
+    mach_msg_type_number_t cnt = 0;
+    if (host_processor_info(mach_host_self(), PROCESSOR_CPU_LOAD_INFO, &n, &info, &cnt) != KERN_SUCCESS) return false;
+    total = idle = 0;
+    auto* cl = reinterpret_cast<processor_cpu_load_info_t>(info);
+    for (natural_t i = 0; i < n; ++i)
+        for (int k = 0; k < CPU_STATE_MAX; ++k) {
+            total += cl[i].cpu_ticks[k];
+            if (k == CPU_STATE_IDLE) idle += cl[i].cpu_ticks[k];
+        }
+    vm_deallocate(mach_task_self(), (vm_address_t)info, (vm_size_t)cnt * sizeof(integer_t));
+    return true;
+}
+
+double ramUsedPercent()
+{
+    uint64_t mem = sysctlNum("hw.memsize");
+    if (!mem) return -1;
+    vm_statistics64_data_t vm;
+    mach_msg_type_number_t c = HOST_VM_INFO64_COUNT;
+    if (host_statistics64(mach_host_self(), HOST_VM_INFO64, (host_info64_t)&vm, &c) != KERN_SUCCESS) return -1;
+    vm_size_t page = 0;
+    host_page_size(mach_host_self(), &page);
+    double avail = ((double)vm.free_count + (double)vm.inactive_count) * (double)page;
+    double used = std::max(0.0, (double)mem - avail);
+    return 100.0 * used / (double)mem;
+}
+#endif
+
 std::string sysStatsJson()
 {
     static std::mutex mu;
     static unsigned long long pTotal = 0, pIdle = 0;
     std::lock_guard<std::mutex> l(mu);
     double cpu = -1;
+    double ram = -1;
+#ifdef __APPLE__
+    {
+        unsigned long long total = 0, idle = 0;
+        if (cpuTicks(total, idle)) {
+            if (pTotal && total > pTotal) cpu = 100.0 * (double)((total - pTotal) - (idle - pIdle)) / (double)(total - pTotal);
+            pTotal = total; pIdle = idle;
+        }
+        ram = ramUsedPercent();
+    }
+#else
     {
         std::ifstream f("/proc/stat");
         std::string tag; unsigned long long u = 0, n = 0, sy = 0, id = 0, io = 0, irq = 0, sirq = 0, st = 0;
@@ -1055,7 +1164,6 @@ std::string sysStatsJson()
         if (pTotal && total > pTotal) cpu = 100.0 * (double)((total - pTotal) - (idle - pIdle)) / (double)(total - pTotal);
         pTotal = total; pIdle = idle;
     }
-    double ram = -1;
     {
         std::ifstream f("/proc/meminfo");
         std::string k; unsigned long long v; std::string unit;
@@ -1063,14 +1171,30 @@ std::string sysStatsJson()
         while (f >> k >> v >> unit) { if (k == "MemTotal:") tot = v; else if (k == "MemAvailable:") avail = v; }
         if (tot) ram = 100.0 * (double)(tot - avail) / (double)tot;
     }
+#endif
     double temp = cpuTempC();
     return "{\"cpu\":" + numC(cpu) + ",\"ram\":" + numC(ram) + ",\"temp\":" + numC(temp) + "}";
 }
 
 std::string hwInfoJson()
 {
+    int cores = 1, logical = 1, rec = 1, l3kb = 0, hugeNow = 0;
+    double ramGb = 0;
+    bool huge = false, msr = false;
+    std::string thp;
+#ifdef __APPLE__
+    {
+        cores = std::max(1, (int)sysctlNum("hw.physicalcpu"));
+        logical = std::max(cores, (int)sysctlNum("hw.logicalcpu"));
+        ramGb = (double)sysctlNum("hw.memsize") / 1073741824.0;
+        l3kb = (int)(sysctlNum("hw.l3cachesize") / 1024);
+        int perf = (int)sysctlNum("hw.perflevel0.physicalcpu");   // performance cores on Apple Silicon
+        rec = perf > 0 ? perf : (cores <= 2 ? 1 : cores - 1);
+        rec = std::max(1, std::min(rec, logical));
+    }
+#else
     std::set<std::pair<std::string, std::string>> phys;
-    int logical = 0;
+    logical = 0;
     {
         std::istringstream in(readFile("/proc/cpuinfo"));
         std::string line, pid = "0", cid = "";
@@ -1083,29 +1207,37 @@ std::string hwInfoJson()
             else if (k == "core id") { cid = v; phys.insert({ pid, cid }); }
         }
     }
-    int cores = phys.empty() ? std::max(1, logical) : (int)phys.size();
+    cores = phys.empty() ? std::max(1, logical) : (int)phys.size();
     if (logical < 1) logical = cores;
-    double ramGb = 0;
     {
         std::istringstream in(readFile("/proc/meminfo"));
         std::string k, unit; unsigned long long v;
         while (in >> k >> v >> unit) if (k == "MemTotal:") { ramGb = (double)v / 1048576.0; break; }
     }
-    bool huge = std::atoi(trim(readFile("/proc/sys/vm/nr_hugepages")).c_str()) > 0;
-    bool msr = fs::exists("/dev/cpu/0/msr");
+    huge = std::atoi(trim(readFile("/proc/sys/vm/nr_hugepages")).c_str()) > 0;
+    msr = fs::exists("/dev/cpu/0/msr");
     std::string l3t = trim(readFile("/sys/devices/system/cpu/cpu0/cache/index3/size"));   // e.g. "16384K"
-    int l3kb = std::atoi(l3t.c_str());
+    l3kb = std::atoi(l3t.c_str());
     if (!l3t.empty() && l3t.back() == 'M') l3kb *= 1024;
     int byCache = l3kb > 0 ? std::max(1, l3kb / 2048) : cores;   // RandomX: ~2 MB of L3 per thread
-    int rec = cores <= 2 ? 1 : std::max(1, std::min(byCache, cores - 1));
+    rec = cores <= 2 ? 1 : std::max(1, std::min(byCache, cores - 1));
     rec = std::min(rec, std::max(1, logical));
-    int hugeNow = std::atoi(trim(readFile("/proc/sys/vm/nr_hugepages")).c_str());
-    std::string thp = trim(readFile("/sys/kernel/mm/transparent_hugepage/enabled"));
+    hugeNow = std::atoi(trim(readFile("/proc/sys/vm/nr_hugepages")).c_str());
+    thp = trim(readFile("/sys/kernel/mm/transparent_hugepage/enabled"));
+#endif
     bool onBat = onBattery();
+#ifdef __APPLE__
+    const char* platform = "macos";
+    bool hugeSupported = false;
+#else
+    const char* platform = "linux";
+    bool hugeSupported = true;
+#endif
     return "{\"cores\":" + std::to_string(cores) + ",\"logical\":" + std::to_string(logical) + ",\"ramGb\":" + numC(ramGb) +
            ",\"hugePages\":" + jbool(huge) + ",\"msr\":" + jbool(msr) + ",\"recommended\":" + std::to_string(rec) +
            ",\"hugeNow\":" + std::to_string(hugeNow) + ",\"hugeWant\":1280,\"l3kb\":" + std::to_string(l3kb) +
-           ",\"thp\":" + jstr(thp) + ",\"battery\":" + jbool(onBat) + "}";
+           ",\"thp\":" + jstr(thp) + ",\"battery\":" + jbool(onBat) +
+           ",\"platform\":\"" + platform + "\",\"hugeSupported\":" + jbool(hugeSupported) + "}";
 }
 
 std::string configPath() { return homeDir() + "/.local/share/hushrate/config.txt"; }

@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
+sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
 W=${1:?work dir}; rm -rf "$W"; mkdir -p "$W/files" "$W/srv/repos" "$W/gnupg" "$W/fakebin" "$W/home"
 chmod 700 "$W/gnupg"
 export GNUPGHOME="$W/gnupg"
 gpg --batch --passphrase '' --quick-generate-key "hushrate test <t@t>" ed25519 sign never 2>/dev/null
 gpg --list-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}' > "$W/fpr.txt"
 gpg --armor --export > "$W/pub.asc"
-head -c 100000 /dev/urandom > "$W/files/data.bin"; sha256sum "$W/files/data.bin" | cut -d' ' -f1 | tr -d '\n' > "$W/data.sha"
+head -c 100000 /dev/urandom > "$W/files/data.bin"; sha256 "$W/files/data.bin" | cut -d' ' -f1 | tr -d '\n' > "$W/data.sha"
 PORT=$((20000 + RANDOM % 20000)); RPC=$((PORT+1)); ZMQ=$((PORT+2))
 mk() { # repo bin asset mode [tamper]
   local repo=$1 bin=$2 asset=$3 mode=$4 tamper=${5:-0}
   local F="$W/files/$repo"; mkdir -p "$F"
   local d=$(mktemp -d); mkdir -p "$d/${bin}-9.9.9"; printf '#!/bin/sh\necho %s 9.9.9\n' "$bin" > "$d/${bin}-9.9.9/$bin"; chmod +x "$d/${bin}-9.9.9/$bin"
   tar -czf "$F/$asset" -C "$d" "${bin}-9.9.9"
-  local h=$(sha256sum "$F/$asset" | cut -d' ' -f1)
+  local h=$(sha256 "$F/$asset" | cut -d' ' -f1)
   if [ "$mode" = detached ]; then
     echo "$h *$asset" > "$F/SHA256SUMS"; gpg --batch --yes --detach-sign -o "$F/SHA256SUMS.sig" "$F/SHA256SUMS"
   else
@@ -96,7 +97,9 @@ sleep 1
 export HOME="$W/home"
 RC=0
 g++ -std=c++17 -DHUSHRATE_TEST -I"$HERE/stub" -I"$HERE/../module/src" "$HERE/../module/src/hushrate_core_impl.cpp" "$HERE/test_main.cpp" -o "$W/t" -pthread
-stdbuf -oL "$W/t" "$W" "$PORT" "$RPC" "$ZMQ" "$((PORT+3))" || RC=$?
+if command -v stdbuf >/dev/null 2>&1; then SB="stdbuf -oL"; else SB=""; fi
+$SB "$W/t" "$W" "$PORT" "$RPC" "$ZMQ" "$((PORT+3))" || RC=$?
 kill "$(cat "$W/http.pid")" "$(cat "$W/lis.pid")" 2>/dev/null || true
-echo "leftover fake procs after exit:"; pgrep -af "$W/fakebin" || echo "  none"
+echo "leftover fake procs after exit:"
+if pgrep -f "$W/fakebin" >/dev/null 2>&1; then pgrep -fl "$W/fakebin" || true; else echo "  none"; fi
 exit $RC

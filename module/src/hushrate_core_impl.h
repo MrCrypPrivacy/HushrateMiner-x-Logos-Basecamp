@@ -3,7 +3,7 @@
 #include <string>
 #include "logos_module_context.h"
 
-// Hushrate Miner core (Linux): downloads and verifies XMRig/P2Pool (SHA256 +
+// Hushrate Miner core (Linux and macOS): downloads and verifies XMRig/P2Pool (SHA256 +
 // pinned GPG key), runs P2Pool + XMRig, exposes state. Everything is
 // std::string; replies are JSON text.
 class HushrateCoreImpl : public LogosModuleContext

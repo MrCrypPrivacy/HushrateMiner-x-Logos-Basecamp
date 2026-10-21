@@ -1,0 +1,25 @@
+name: Test macOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'module/**'
+      - 'test/**'
+      - '.github/workflows/test-macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-latest
+    # Informational while the macOS port is being validated: a failure here does not fail the run.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install gnupg
+        run: brew install gnupg
+      - name: Core test suite
+        run: bash test/run_tests.sh "$RUNNER_TEMP/hushrate-test"

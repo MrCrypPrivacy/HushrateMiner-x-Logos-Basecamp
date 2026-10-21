@@ -61,7 +61,7 @@ Item {
     property bool pauseBattery: false
     property bool fallbackPublic: true
     property int zeroTicks: 0
-    property var hw: ({ cores: 0, logical: 0, ramGb: 0, hugePages: false, msr: false, recommended: 0 })
+    property var hw: ({ cores: 0, logical: 0, ramGb: 0, hugePages: false, msr: false, recommended: 0, hugeSupported: true })
     property bool hwOk: false
     property bool hwTried: false
     property string hwErr: ""
@@ -684,11 +684,11 @@ Item {
                         }
                         Text {
                             Layout.fillWidth: true; wrapMode: Text.Wrap
-                            visible: root.hwOk
+                            visible: root.hwOk && root.hw.hugeSupported !== false
                             text: root.hw.hugePages ? root.tr("p_hugeOn", root.hw.hugeNow) : root.tr("p_hugeOff")
                             color: root.hw.hugePages ? root.ash : "#e6c84a"; font.family: root.mono; font.pixelSize: 11
                         }
-                        HBtn { visible: root.hwOk && !root.hw.hugePages; label: root.tr("p_hugeBtn"); onClicked: hugePopup.open() }
+                        HBtn { visible: root.hwOk && root.hw.hugeSupported !== false && !root.hw.hugePages; label: root.tr("p_hugeBtn"); onClicked: hugePopup.open() }
                         HBtn { label: root.tr("p_apply"); enabledBtn: true; onClicked: { root.saveCfg(); root.say(root.running ? root.tr("p_savedNext") : root.tr("p_saved"), false) } }
                     }
 
