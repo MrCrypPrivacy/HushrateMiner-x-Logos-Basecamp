@@ -19,30 +19,25 @@ UI="$ROOT/ui"
 RUN="$ROOT/run"
 DIST="$ROOT/dist"
 VERSION="$(tr -d '[:space:]' < "$REPO/VERSION")"
-PKG_VERSION="0.9.1"   # package metadata must be semver; the UI shows $VERSION
 
 track_changes() {   # nix flakes only see git-tracked files: stage what changed, file by file
   git ls-files -z --others --modified --exclude-standard | xargs -0 -r git add --
+}
+
+check_versions() {   # the package version (semver) lives in both metadata.json files and must match
+  python3 -I - "$REPO/module/metadata.json" "$REPO/ui/metadata.json" <<'PY'
+import json, sys
+v = [json.load(open(p))["version"] for p in sys.argv[1:]]
+if v[0] != v[1]:
+    sys.exit("module/metadata.json (%s) and ui/metadata.json (%s) must have the same version" % (v[0], v[1]))
+PY
 }
 
 write_module() {
   mkdir -p "$MODULE/src"
   rm -f "$MODULE"/src/minimal_impl.h "$MODULE"/src/minimal_impl.cpp   # left over from the template
   cp -f "$REPO"/module/src/hushrate_core_impl.h "$REPO"/module/src/hushrate_core_impl.cpp "$REPO"/module/src/hushrate_keys.h "$MODULE/src/"
-  sed -i -e 's/minimal_impl/hushrate_core_impl/g' -e 's/MinimalModulePlugin/HushrateCorePlugin/' "$MODULE/CMakeLists.txt"
-  PKG_VERSION="$PKG_VERSION" python3 -I - "$MODULE/metadata.json" <<'PY'
-import json, os, sys
-p = sys.argv[1]
-d = json.load(open(p))
-d.update({
-    "name": "hushrate_core",
-    "display_name": "Hushrate Core",
-    "version": os.environ["PKG_VERSION"],
-    "description": "Hushrate Miner core: downloads and verifies XMRig and P2Pool and runs them",
-    "main": "hushrate_core_plugin",
-})
-json.dump(d, open(p, "w"), indent=2)
-PY
+  cp -f "$REPO"/module/flake.nix "$REPO"/module/metadata.json "$REPO"/module/CMakeLists.txt "$MODULE/"
 }
 
 write_ui() {
@@ -69,29 +64,7 @@ NIX
   [ -f "$ROOT/links.json" ] && links=("$ROOT/links.json")
   python3 -I "$REPO/tools/build_ui.py" "$UI/Main.qml" "${links[@]}"
   cp -f "$REPO/assets/sidebar_256.png" "$UI/icons/hushrate.png"
-  PKG_VERSION="$PKG_VERSION" python3 -I - "$UI/metadata.json" <<'PY'
-import json, os, sys
-p = sys.argv[1]
-try:
-    d = json.load(open(p))
-except Exception:
-    d = {}
-d.update({
-    "name": "hushrate_miner",
-    "version": os.environ["PKG_VERSION"],
-    "description": "Hushrate Miner: solo Monero mining with P2Pool + XMRig",
-    "type": "ui_qml",
-    "view": "Main.qml",
-    "dependencies": ["hushrate_core"],
-    "category": "tools",
-    "icon": "icons/hushrate.png",
-})
-for k, v in list(d.items()):
-    if isinstance(v, str) and "QML UI Example" in v:
-        d[k] = v.replace("QML UI Example", "HushRate Miner")
-d.pop("main", None)   # QML only: no C++ backend
-json.dump(d, open(p, "w"), indent=2)
-PY
+  cp -f "$REPO/ui/metadata.json" "$UI/metadata.json"
 }
 
 build_both() {   # $1 = link name (module|ui)
@@ -104,12 +77,11 @@ build_both() {   # $1 = link name (module|ui)
 }
 
 prepare() {
+  check_versions
   mkdir -p "$MODULE" "$UI" "$RUN"
 
   echo "== 1/4 Module (backend) =="
   cd "$MODULE"
-  [ -f flake.nix ] || nix flake init -t github:logos-co/logos-module-builder
-  [ -f metadata.json ] || { echo "The template did not create metadata.json. Check: ls -R $MODULE"; exit 1; }
   write_module
   [ -d .git ] || git init -q
   track_changes
@@ -119,7 +91,6 @@ prepare() {
 
   echo "== 2/4 Interface (QML) =="
   cd "$UI"
-  [ -f flake.nix ] || nix flake init -t 'github:logos-co/logos-module-builder#ui-qml'
   write_ui
   [ -d .git ] || git init -q
   track_changes

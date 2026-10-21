@@ -1,0 +1,24 @@
+{
+  "name": "hushrate_core",
+  "display_name": "Hushrate Core",
+  "version": "0.9.1",
+  "type": "core",
+  "interface": "universal",
+  "category": "tools",
+  "description": "Hushrate Miner core: downloads and verifies XMRig and P2Pool and runs them",
+  "main": "hushrate_core_plugin",
+  "dependencies": [],
+  "nix": {
+    "packages": {
+      "build": [],
+      "runtime": []
+    },
+    "external_libraries": [],
+    "cmake": {
+      "find_packages": [],
+      "extra_sources": [],
+      "extra_include_dirs": [],
+      "extra_link_libraries": []
+    }
+  }
+}
