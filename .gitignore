@@ -6,7 +6,7 @@ run/
 dist/
 
 # local settings and secrets (wallet address lives here)
-links.json
+/links.json
 config.txt
 config.enc
 *.env

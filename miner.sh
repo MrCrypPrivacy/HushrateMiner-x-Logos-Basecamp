@@ -8,7 +8,7 @@
 #   ./miner.sh reset     delete the isolated Basecamp dev profile (the official Basecamp is untouched)
 #
 # Needs: nix (flakes enabled), git, python3. Build files go to $HUSHRATE_BUILD (default ~/basecamp-miner).
-# Optional: <build dir>/links.json  {"urlGithub": "https://...", "urlX": "https://..."}  (empty = button hidden)
+# Link buttons: ui/links.json {"urlGithub": "https://...", "urlX": "https://..."} (empty = button hidden); <build dir>/links.json overrides it
 set -euo pipefail
 trap 'echo; echo "FAILED at line $LINENO. Copy the whole output above when reporting it."' ERR
 
@@ -63,7 +63,8 @@ write_ui() {
 }
 NIX
   local links=()
-  [ -f "$ROOT/links.json" ] && links=("$ROOT/links.json")
+  if [ -f "$ROOT/links.json" ]; then links=("$ROOT/links.json")
+  elif [ -f "$REPO/ui/links.json" ]; then links=("$REPO/ui/links.json"); fi
   python3 -I "$REPO/tools/build_ui.py" "$UI/Main.qml" ${links[@]+"${links[@]}"}
   cp -f "$REPO/assets/sidebar_256.png" "$UI/icons/hushrate.png"
   cp -f "$REPO/ui/metadata.json" "$UI/metadata.json"
