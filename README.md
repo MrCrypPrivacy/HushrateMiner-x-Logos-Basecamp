@@ -65,7 +65,7 @@ sha256sum -c SHA256SUMS
 - Logos Basecamp (official release or development build)
 - Linux x86_64, with `curl`, `gpg` and `tar` installed
 
-Linux x86_64 is the only supported platform at the moment. Windows and macOS support is planned.
+Linux x86_64 is the supported platform. macOS on Apple Silicon is experimental. Windows support is planned
 
 ## Usage
 
