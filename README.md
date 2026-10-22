@@ -62,8 +62,7 @@ sha256sum -c SHA256SUMS
 
 ### Requirements
 
-- Logos Basecamp (official release or development build)
-- Linux x86_64, with `curl`, `gpg` and `tar` installed
+Linux x86_64, with curl, gpg and tar installed, or macOS on Apple Silicon with gnupg installed (brew install gnupg; curl and tar come with macOS)
 
 Linux x86_64 is the supported platform. macOS on Apple Silicon is experimental. Windows support is planned
 
